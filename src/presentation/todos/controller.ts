@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../../data/postges";
+import { CreateTodoDto } from "../../domain/dtos/todos/create-todo.dto";
+import { UpdateTodoDto } from "../../domain/dtos/todos/update-todo.dto";
 
 export class TodosController {
   constructor() {}
@@ -39,16 +41,13 @@ export class TodosController {
     }
   };
   public createTodo = async (req: Request, res: Response) => {
-    const { text } = req.body;
-
-    if (!text) {
-      return res.status(400).json({ message: "Text is required" });
+    const [error, createTodoDto] = CreateTodoDto.create(req.body);
+    if (error) {
+      return res.status(400).json({ error });
     }
     try {
       const todo = await prisma.todo.create({
-        data: {
-          text,
-        },
+        data: createTodoDto!,
       });
       return res.status(201).json(todo);
     } catch (error) {
@@ -59,31 +58,34 @@ export class TodosController {
 
   public updateTodo = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const todoId = Number(id);
 
-    if (isNaN(todoId)) {
-      return res.status(400).json({
-        error: "El id debe ser un número",
-      });
+    const [error, updateTodoDto] = UpdateTodoDto.create({
+      id,
+      ...req.body,
+    });
+
+    if (error) {
+      return res.status(400).json({ error });
     }
     try {
       const foundTodo = await prisma.todo.findFirst({
         where: {
-          id: todoId,
+          id: updateTodoDto!.id,
         },
       });
       if (!foundTodo) {
         return res.status(404).json({ message: "Todo not found" });
       }
-      const { text, completedAt } = req.body;
 
       const updateTodo = await prisma.todo.update({
         where: {
-          id: todoId,
+          id: updateTodoDto!.id,
         },
         data: {
-          text,
-          completedAt: completedAt ? new Date(completedAt) : null,
+          text: updateTodoDto!.text,
+          completedAt: updateTodoDto!.completedAt
+            ? new Date(updateTodoDto!.completedAt)
+            : null,
         },
       });
       return res.status(200).json(updateTodo);
