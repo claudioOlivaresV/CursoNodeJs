@@ -1,62 +1,125 @@
 import { Request, Response } from "express";
-
-const todo = [
-  { id: 1, text: "Learn TypeScript", createAt: new Date() },
-  { id: 2, text: "Learn Node.js", createAt: null },
-  { id: 3, text: "Learn Express", createAt: new Date() },
-];
+import { prisma } from "../../data/postges";
 
 export class TodosController {
   constructor() {}
-  public getTodos = (req: Request, res: Response) => {
-    return res.json(todo);
+  public getTodos = async (req: Request, res: Response) => {
+    try {
+      const todos = await prisma.todo.findMany();
+      return res.json(todos);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   };
 
-  public getTodoById = (req: Request, res: Response) => {
+  public getTodoById = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const foundTodo = todo.find((t) => t.id === Number(id));
-    if (!foundTodo) {
-      return res.status(404).json({ message: "Todo not found" });
+    const todoId = Number(id);
+
+    if (isNaN(todoId)) {
+      return res.status(400).json({
+        error: "El id debe ser un número",
+      });
     }
-    return res.status(200).json(foundTodo);
+
+    try {
+      const foundTodo = await prisma.todo.findFirst({
+        where: {
+          id: todoId,
+        },
+      });
+      if (!foundTodo) {
+        return res.status(404).json({ message: "Todo not found" });
+      }
+      return res.status(200).json(foundTodo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   };
-  public createTodo = (req: Request, res: Response) => {
+  public createTodo = async (req: Request, res: Response) => {
     const { text } = req.body;
 
     if (!text) {
       return res.status(400).json({ message: "Text is required" });
     }
-    const newTodo = {
-      id: todo.length + 1,
-      text,
-      createAt: null,
-    };
-    todo.push(newTodo);
-    return res.status(201).json(newTodo);
+    try {
+      const todo = await prisma.todo.create({
+        data: {
+          text,
+        },
+      });
+      return res.status(201).json(todo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   };
 
-  public updateTodo = (req: Request, res: Response) => {
-    const id = +req.params.id;
-    const foundTodo = todo.find((t) => t.id === id);
-    if (!foundTodo) {
-      return res.status(404).json({ message: "Todo not found" });
+  public updateTodo = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const todoId = Number(id);
+
+    if (isNaN(todoId)) {
+      return res.status(400).json({
+        error: "El id debe ser un número",
+      });
     }
-    const { text } = req.body;
-    if (!text) {
-      return res.status(400).json({ message: "Text is required" });
+    try {
+      const foundTodo = await prisma.todo.findFirst({
+        where: {
+          id: todoId,
+        },
+      });
+      if (!foundTodo) {
+        return res.status(404).json({ message: "Todo not found" });
+      }
+      const { text, completedAt } = req.body;
+
+      const updateTodo = await prisma.todo.update({
+        where: {
+          id: todoId,
+        },
+        data: {
+          text,
+          completedAt: completedAt ? new Date(completedAt) : null,
+        },
+      });
+      return res.status(200).json(updateTodo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
     }
-    foundTodo.text = text;
-    foundTodo.createAt = new Date();
-    return res.status(200).json(foundTodo);
   };
 
-  public deleteTodo = (req: Request, res: Response) => {
-    const id = +req.params.id;
-    const foundTodo = todo.find((t) => t.id === id);
-    if (!foundTodo) {
-      return res.status(404).json({ message: "Todo not found" });
+  public deleteTodo = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const todoId = Number(id);
+
+    if (isNaN(todoId)) {
+      return res.status(400).json({
+        error: "El id debe ser un número",
+      });
     }
-    todo.splice(todo.indexOf(foundTodo), 1);
-    return res.status(200).json(foundTodo);
+    try {
+      const foundTodo = await prisma.todo.findFirst({
+        where: {
+          id: todoId,
+        },
+      });
+      if (!foundTodo) {
+        return res.status(404).json({ message: "Todo not found" });
+      }
+      const deleted = await prisma.todo.delete({
+        where: {
+          id: todoId,
+        },
+      });
+      return res.status(200).json(deleted);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   };
 }
